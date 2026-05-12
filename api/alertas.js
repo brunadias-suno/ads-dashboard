@@ -2,14 +2,10 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const RESEND_KEY = process.env.RESEND_API_KEY;
-  const META_TOKEN = process.env.META_TOKEN;
-  const ACCOUNT_ID = process.env.META_ACCOUNT_ID;
-  const META_CPA = parseFloat(process.env.META_CPA_META || "50");
-
-  if (!RESEND_KEY || !META_TOKEN || !ACCOUNT_ID) {
-    return res.status(500).json({ error: "Variáveis de ambiente não configuradas." });
-  }
+  const RESEND_KEY = "re_PLWXn55R_G2xXZQGryGgedsoTDLXjKSk6";
+  const META_TOKEN = "EAAqis7UPhZAUBRdhHjcr0CrhZAKsVRZBcbHCEJcOglhx9wOP0ckZBBYaw6uZBDjGcVtj1QHeDzKlRPFdczT154DKAjZCAJzQ0nTZAGJ99wYsxcNxlSbtfBb4GksNnkPteREZBeqnZB4qr61cFKyyOTXLyAWKumDGwa5j9DWSxrbQcWFLXWMJlEMXJygI7lGDcCQZDZD";
+  const ACCOUNT_ID = "act_480556106171722";
+  const META_CPA = 50;
 
   // 1. Buscar dados da Meta
   try {
