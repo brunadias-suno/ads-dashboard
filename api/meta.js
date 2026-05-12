@@ -14,13 +14,15 @@ export default async function handler(req, res) {
 
   const { periodo = "last_7d", inicio, fim } = req.query;
 
-  let insightsParams = `date_preset:${periodo}`;
+  let insightsFilter = "";
   if (periodo === "custom" && inicio && fim) {
-    insightsParams = `time_range:{'since':'${inicio}','until':'${fim}'}`;
+    insightsFilter = `.date_range(since=${inicio},until=${fim})`;
+  } else {
+    insightsFilter = `.date_preset(${periodo})`;
   }
 
   try {
-    const fields = `name,status,daily_budget,lifetime_budget,insights.${insightsParams}{spend,impressions,reach,clicks,actions}`;
+    const fields = `name,status,daily_budget,lifetime_budget,insights${insightsFilter}{spend,impressions,reach,clicks,actions}`;
     const url = `https://graph.facebook.com/v19.0/${ACCOUNT_ID}/campaigns?fields=${encodeURIComponent(fields)}&access_token=${TOKEN}&limit=50`;
 
     const response = await fetch(url);
