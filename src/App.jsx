@@ -155,7 +155,10 @@ export default function AdsDashboard() {
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInput, setAiInput] = useState("");
-  const [chatHistory, setChatHistory] = useState([]);
+  const [chatHistory, setChatHistory] = useState([]);const [filtro, setFiltro] = useState("Todas");
+const campanhasFiltradas = campanhas.filter(c =>
+  filtro === "Todas" ? true : filtro === "Ativas" ? c.status === "ACTIVE" : c.status === "PAUSED"
+);
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -172,7 +175,7 @@ export default function AdsDashboard() {
     setErro(null);
     try {
       // Buscar campanhas com insights (spend, impressions, clicks, conversions)
-      const url = `https://graph.facebook.com/v19.0/${META_ACCOUNT_ID}/campaigns?fields=name,status,daily_budget,lifetime_budget,insights{spend,impressions,clicks,actions}&date_preset=last_7d&access_token=${META_TOKEN}&limit=50`;
+      const url = `/api/meta`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -418,9 +421,21 @@ Responda de forma direta e prática, com recomendações específicas para essas
             <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif" }}>
-                  Todas as campanhas — Meta Ads (últimos 7 dias)
+                  Campanhas — Meta Ads (últimos 7 dias)
                 </div>
-                <span style={{ fontSize: 11, color: COLORS.muted }}>{campanhas.length} campanhas</span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["Todas", "Ativas", "Pausadas"].map(f => (
+                    <button key={f} onClick={() => setFiltro(f)} style={{
+                      background: filtro === f ? COLORS.accent : "#1E2028",
+                      border: `1px solid ${filtro === f ? COLORS.accent : COLORS.border}`,
+                      borderRadius: 8, padding: "5px 14px", color: filtro === f ? "#000" : COLORS.muted,
+                      fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    }}>{f}</button>
+                  ))}
+                  <span style={{ fontSize: 11, color: COLORS.muted, alignSelf: "center", marginLeft: 4 }}>
+                    {campanhasFiltradas.length} campanhas
+                  </span>
+                </div>
               </div>
               {loading ? (
                 <div style={{ textAlign: "center", padding: 40, color: COLORS.muted }}>Carregando dados reais...</div>
@@ -433,8 +448,8 @@ Responda de forma direta e prática, com recomendações específicas para essas
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
-                    {campanhas.map((c, i) => (
+                  <tbody
+                    {campanhasFiltradas.map((c, i) => (
                       <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
                         <td style={{ padding: "14px 12px", color: COLORS.text, fontWeight: 500, maxWidth: 220 }}>
                           <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</div>
