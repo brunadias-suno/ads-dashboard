@@ -15,11 +15,9 @@ const COLORS = {
   muted: "#6B7280",
 };
 
-// ⚠️ CONFIGURAÇÃO DA API META — substitua pelos seus valores
-const META_TOKEN = "EAAqis7UPhZAUBReTL4WVSOsP1kdlJJl87KY4qtzIieBI4WIimt5WS0GvjA5GqLh2suZCZBZAlqZBoVZBPwIyJX20AYHpaJjN0oX0kwWGacvXHBZA3mQDZAqTsna72TXPgUXr5uFuB2F5J0kzrV2fBAIAFsXJlkPQaQylEOdVBZCoGkAAmjNe15uXvtZBf6mAg5OAZDZD";
+const META_TOKEN = "EAAqis7UPhZAUBRdhHjcr0CrhZAKsVRZBcbHCEJcOglhx9wOP0ckZBBYaw6uZBDjGcVtj1QHeDzKlRPFdczT154DKAjZCAJzQ0nTZAGJ99wYsxcNxlSbtfBb4GksNnkPteREZBeqnZB4qr61cFKyyOTXLyAWKumDGwa5j9DWSxrbQcWFLXWMJlEMXJygI7lGDcCQZDZD";
 const META_ACCOUNT_ID = "act_480556106171722";
 
-// Dados de fallback (mockados) caso a API falhe
 const mockPerfData = [
   { day: "Seg", meta: 3100, conversoes: 42 },
   { day: "Ter", meta: 3400, conversoes: 38 },
@@ -30,16 +28,32 @@ const mockPerfData = [
   { day: "Dom", meta: 3200, conversoes: 44 },
 ];
 
+// Todas as colunas disponíveis
+const COLUNAS_DISPONIVEIS = [
+  { id: "gasto", label: "Gasto (7d)", default: true },
+  { id: "impressoes", label: "Impressões", default: true },
+  { id: "alcance", label: "Alcance", default: false },
+  { id: "cliques", label: "Cliques", default: true },
+  { id: "ctr", label: "CTR", default: true },
+  { id: "cpc", label: "CPC", default: false },
+  { id: "cpm", label: "CPM", default: false },
+  { id: "conversoes", label: "Conversões", default: true },
+  { id: "cpa", label: "CPA", default: true },
+  { id: "roas", label: "ROAS", default: false },
+  { id: "frequencia", label: "Frequência", default: false },
+  { id: "leads", label: "Leads", default: false },
+  { id: "compras", label: "Compras", default: false },
+  { id: "cadastros", label: "Cadastros", default: false },
+  { id: "mensagens", label: "Mensagens iniciadas", default: false },
+  { id: "visualizacoes", label: "Visualizações de vídeo", default: false },
+  { id: "budget", label: "Budget diário", default: false },
+];
+
 function MetricCard({ label, value, sub, subType, icon, loading }) {
   return (
     <div style={{
-      background: COLORS.card,
-      border: `1px solid ${COLORS.border}`,
-      borderRadius: 12,
-      padding: "20px 24px",
-      display: "flex",
-      flexDirection: "column",
-      gap: 8,
+      background: COLORS.card, border: `1px solid ${COLORS.border}`,
+      borderRadius: 12, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 8,
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 13, color: COLORS.muted, fontFamily: "'DM Sans', sans-serif" }}>{label}</span>
@@ -50,11 +64,7 @@ function MetricCard({ label, value, sub, subType, icon, loading }) {
       ) : (
         <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -1 }}>{value}</div>
       )}
-      <div style={{
-        fontSize: 12,
-        color: subType === "up" ? COLORS.success : subType === "down" ? COLORS.danger : COLORS.warning,
-        fontFamily: "'DM Sans', sans-serif",
-      }}>{sub}</div>
+      <div style={{ fontSize: 12, color: subType === "up" ? COLORS.success : subType === "down" ? COLORS.danger : COLORS.warning }}>{sub}</div>
     </div>
   );
 }
@@ -68,15 +78,7 @@ function StatusBadge({ status }) {
   };
   const s = map[status] || map.PAUSED;
   return (
-    <span style={{
-      background: s.bg,
-      color: s.color,
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "3px 10px",
-      borderRadius: 20,
-      fontFamily: "'DM Sans', sans-serif",
-    }}>{s.label}</span>
+    <span style={{ background: s.bg, color: s.color, fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20 }}>{s.label}</span>
   );
 }
 
@@ -88,20 +90,8 @@ function AgentCard({ nome, desc, status, ultimo, icon }) {
   };
   const s = statusMap[status];
   return (
-    <div style={{
-      background: COLORS.card,
-      border: `1px solid ${COLORS.border}`,
-      borderRadius: 10,
-      padding: "14px 16px",
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-    }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 8,
-        background: "#1E2028", display: "flex", alignItems: "center",
-        justifyContent: "center", fontSize: 16, flexShrink: 0,
-      }}>{icon}</div>
+    <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 8, background: "#1E2028", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.text, fontFamily: "'Space Grotesk', sans-serif" }}>{nome}</div>
         <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 2 }}>{desc}</div>
@@ -120,16 +110,10 @@ function AgentCard({ nome, desc, status, ultimo, icon }) {
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div style={{
-        background: "#1E2028", border: `1px solid ${COLORS.border}`,
-        borderRadius: 8, padding: "10px 14px", fontSize: 12,
-        fontFamily: "'DM Sans', sans-serif", color: COLORS.text,
-      }}>
+      <div style={{ background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: COLORS.text }}>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>{label}</div>
         {payload.map((p, i) => (
-          <div key={i} style={{ color: p.color, marginBottom: 2 }}>
-            {p.name}: {typeof p.value === "number" && p.name !== "Conversões" ? `R$${p.value.toLocaleString("pt-BR")}` : p.value}
-          </div>
+          <div key={i} style={{ color: p.color, marginBottom: 2 }}>{p.name}: R${p.value?.toLocaleString("pt-BR")}</div>
         ))}
       </div>
     );
@@ -146,6 +130,36 @@ const agentes = [
   { nome: "Monitor Google Ads", desc: "Integração em breve", status: "standby", ultimo: "—", icon: "G" },
 ];
 
+function getColunaValor(c, colId) {
+  switch (colId) {
+    case "gasto": return c.investimento > 0 ? `R$${c.investimento.toFixed(2)}` : "—";
+    case "impressoes": return c.impressions > 0 ? c.impressions.toLocaleString("pt-BR") : "—";
+    case "alcance": return c.reach > 0 ? c.reach.toLocaleString("pt-BR") : "—";
+    case "cliques": return c.clicks > 0 ? c.clicks.toLocaleString("pt-BR") : "—";
+    case "ctr": return c.ctr > 0 ? `${c.ctr.toFixed(2)}%` : "—";
+    case "cpc": return c.clicks > 0 && c.investimento > 0 ? `R$${(c.investimento / c.clicks).toFixed(2)}` : "—";
+    case "cpm": return c.impressions > 0 && c.investimento > 0 ? `R$${((c.investimento / c.impressions) * 1000).toFixed(2)}` : "—";
+    case "conversoes": return c.conversoes > 0 ? c.conversoes : "—";
+    case "cpa": return c.cpa > 0 ? `R$${c.cpa.toFixed(2)}` : "—";
+    case "roas": return c.roas > 0 ? `${c.roas.toFixed(1)}x` : "—";
+    case "frequencia": return c.frequencia > 0 ? c.frequencia.toFixed(2) : "—";
+    case "leads": return c.leads > 0 ? c.leads : "—";
+    case "compras": return c.compras > 0 ? c.compras : "—";
+    case "cadastros": return c.cadastros > 0 ? c.cadastros : "—";
+    case "mensagens": return c.mensagens > 0 ? c.mensagens : "—";
+    case "visualizacoes": return c.visualizacoes > 0 ? c.visualizacoes.toLocaleString("pt-BR") : "—";
+    case "budget": return c.budget > 0 ? `R$${c.budget.toFixed(2)}` : "—";
+    default: return "—";
+  }
+}
+
+function getColunaColor(c, colId) {
+  if (colId === "cpa") return c.cpa > 150 ? COLORS.danger : c.cpa > 0 ? COLORS.text : COLORS.muted;
+  if (colId === "roas") return c.roas >= 3.5 ? COLORS.success : c.roas >= 2 ? COLORS.warning : c.roas > 0 ? COLORS.danger : COLORS.muted;
+  if (colId === "ctr") return c.ctr > 2 ? COLORS.success : c.ctr > 0 ? COLORS.text : COLORS.muted;
+  return COLORS.text;
+}
+
 export default function AdsDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [now, setNow] = useState(new Date());
@@ -157,10 +171,13 @@ export default function AdsDashboard() {
   const [aiInput, setAiInput] = useState("");
   const [chatHistory, setChatHistory] = useState([]);
   const [filtro, setFiltro] = useState("Todas");
+  const [colunasAtivas, setColunasAtivas] = useState(COLUNAS_DISPONIVEIS.filter(c => c.default).map(c => c.id));
+  const [showSeletorColunas, setShowSeletorColunas] = useState(false);
+  const chatEndRef = useRef(null);
+
   const campanhasFiltradas = campanhas.filter(c =>
     filtro === "Todas" ? true : filtro === "Ativas" ? c.status === "ACTIVE" : c.status === "PAUSED"
   );
-  const chatEndRef = useRef(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -175,37 +192,44 @@ export default function AdsDashboard() {
     setLoading(true);
     setErro(null);
     try {
-      // Buscar campanhas com insights (spend, impressions, clicks, conversions)
-      const url = `https://graph.facebook.com/v19.0/${META_ACCOUNT_ID}/campaigns?fields=name,status,daily_budget,lifetime_budget,insights{spend,impressions,clicks,actions}&date_preset=last_7d&access_token=${META_TOKEN}&limit=50`;
+      const url = `/api/meta`;
       const res = await fetch(url);
       const data = await res.json();
 
-      if (data.error) {
-        throw new Error(data.error.message);
-      }
+      if (data.error) throw new Error(data.error.message);
 
       const campanhasFormatadas = data.data.map(c => {
         const insights = c.insights?.data?.[0] || {};
         const spend = parseFloat(insights.spend || 0);
         const clicks = parseInt(insights.clicks || 0);
         const impressions = parseInt(insights.impressions || 0);
+        const reach = parseInt(insights.reach || 0);
         const actions = insights.actions || [];
-        const conversoes = actions
-          .filter(a => ["purchase", "lead", "complete_registration", "subscribe"].includes(a.action_type))
+
+        const getAction = (types) => actions
+          .filter(a => types.includes(a.action_type))
           .reduce((sum, a) => sum + parseInt(a.value || 0), 0);
+
+        const conversoes = getAction(["purchase", "lead", "complete_registration", "subscribe"]);
+        const compras = getAction(["purchase", "omni_purchase", "web_in_store_purchase"]);
+        const leads = getAction(["lead", "onsite_conversion.lead"]);
+        const cadastros = getAction(["complete_registration", "omni_complete_registration"]);
+        const mensagens = getAction(["onsite_conversion.messaging_conversation_started_7d"]);
+        const visualizacoes = getAction(["video_view"]);
+
         const cpa = conversoes > 0 ? spend / conversoes : 0;
         const ctr = impressions > 0 ? (clicks / impressions * 100) : 0;
+        const roas = spend > 0 && compras > 0 ? (compras * 100) / spend : 0;
+        const frequencia = reach > 0 && impressions > 0 ? impressions / reach : 0;
 
         return {
-          nome: c.nome || c.name,
+          nome: c.name,
           status: c.status,
           investimento: spend,
-          conversoes,
-          cpa,
-          ctr,
-          impressions,
-          clicks,
-          budget: c.daily_budget ? parseFloat(c.daily_budget) / 100 : null,
+          conversoes, compras, leads, cadastros, mensagens, visualizacoes,
+          cpa, ctr, roas, frequencia,
+          impressions, clicks, reach,
+          budget: c.daily_budget ? parseFloat(c.daily_budget) / 100 : 0,
         };
       });
 
@@ -219,7 +243,6 @@ export default function AdsDashboard() {
 
   useEffect(() => {
     buscarDadosMeta();
-    // Atualiza a cada 30 minutos
     const intervalo = setInterval(buscarDadosMeta, 30 * 60 * 1000);
     return () => clearInterval(intervalo);
   }, []);
@@ -229,6 +252,12 @@ export default function AdsDashboard() {
   const totalConversoes = campanhas.reduce((a, c) => a + c.conversoes, 0);
   const cpaMedio = totalConversoes > 0 ? totalInvestimento / totalConversoes : 0;
   const totalImpressions = campanhas.reduce((a, c) => a + c.impressions, 0);
+
+  function toggleColuna(id) {
+    setColunasAtivas(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  }
 
   async function askAI(pergunta) {
     if (!pergunta.trim()) return;
@@ -242,13 +271,12 @@ export default function AdsDashboard() {
 Total investido: R$${totalInvestimento.toFixed(2)}
 Total conversões: ${totalConversoes}
 CPA médio: R$${cpaMedio.toFixed(2)}
-Total impressões: ${totalImpressions.toLocaleString("pt-BR")}
 Campanhas ativas: ${campanhasAtivas.length} de ${campanhas.length}
 
 Campanhas:
 ${campanhas.slice(0, 15).map(c => `- ${c.nome} (${c.status}): Gasto R$${c.investimento.toFixed(2)}, ${c.conversoes} conversões, CPA R$${c.cpa.toFixed(2)}, CTR ${c.ctr.toFixed(2)}%`).join("\n")}
 
-Responda de forma direta e prática, com recomendações específicas para essas campanhas reais. Use linguagem clara e objetiva.`;
+Responda de forma direta e prática. Use linguagem clara e objetiva.`;
 
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -277,10 +305,12 @@ Responda de forma direta e prática, com recomendações específicas para essas
     { id: "chat", label: "Consultar IA", icon: "💬" },
   ];
 
+  const colunasVisiveis = COLUNAS_DISPONIVEIS.filter(c => colunasAtivas.includes(c.id));
+
   return (
     <div style={{ display: "flex", height: "100vh", background: COLORS.bg, fontFamily: "'DM Sans', sans-serif", color: COLORS.text }}>
       <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} } @keyframes spin { to{transform:rotate(360deg)} }`}</style>
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
 
       {/* Sidebar */}
       <div style={{ width: 220, background: COLORS.card, borderRight: `1px solid ${COLORS.border}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
@@ -291,12 +321,11 @@ Responda de forma direta e prática, com recomendações específicas para essas
         <div style={{ padding: "12px 10px", flex: 1 }}>
           {navItems.map(item => (
             <div key={item.id} onClick={() => setActiveTab(item.id)} style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+              borderRadius: 8, cursor: "pointer",
               background: activeTab === item.id ? "#1E2028" : "transparent",
               color: activeTab === item.id ? COLORS.text : COLORS.muted,
-              fontSize: 13, fontWeight: activeTab === item.id ? 600 : 400,
-              marginBottom: 2, transition: "all 0.15s",
+              fontSize: 13, fontWeight: activeTab === item.id ? 600 : 400, marginBottom: 2,
             }}>
               <span>{item.icon}</span>{item.label}
             </div>
@@ -307,56 +336,39 @@ Responda de forma direta e prática, com recomendações específicas para essas
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: erro ? COLORS.danger : COLORS.success, display: "inline-block" }} />
             {erro ? "API com erro" : "Meta API conectada"}
           </div>
-          {ultimaAtualizacao && (
-            <div style={{ marginTop: 4 }}>Atualizado {ultimaAtualizacao.toLocaleTimeString("pt-BR")}</div>
-          )}
+          {ultimaAtualizacao && <div style={{ marginTop: 4 }}>Atualizado {ultimaAtualizacao.toLocaleTimeString("pt-BR")}</div>}
         </div>
       </div>
 
       {/* Main */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {/* Topbar */}
-        <div style={{
-          height: 56, background: COLORS.card, borderBottom: `1px solid ${COLORS.border}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px",
-        }}>
+        <div style={{ height: 56, background: COLORS.card, borderBottom: `1px solid ${COLORS.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 24px" }}>
           <div style={{ fontSize: 15, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif" }}>
             {navItems.find(n => n.id === activeTab)?.label}
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {erro && (
-              <span style={{ background: "#1A0808", color: COLORS.danger, border: `1px solid ${COLORS.danger}44`, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20 }}>
-                ⚠️ Erro na API
-              </span>
-            )}
-            <button onClick={buscarDadosMeta} disabled={loading} style={{
-              background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8,
-              padding: "5px 12px", color: COLORS.muted, fontSize: 11, cursor: "pointer",
-              opacity: loading ? 0.5 : 1,
-            }}>
+            {erro && <span style={{ background: "#1A0808", color: COLORS.danger, border: `1px solid ${COLORS.danger}44`, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20 }}>⚠️ Erro na API</span>}
+            <button onClick={buscarDadosMeta} disabled={loading} style={{ background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "5px 12px", color: COLORS.muted, fontSize: 11, cursor: "pointer", opacity: loading ? 0.5 : 1 }}>
               {loading ? "⟳ Atualizando..." : "⟳ Atualizar"}
             </button>
-            <span style={{ background: "#052E16", color: COLORS.success, border: `1px solid ${COLORS.success}44`, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20 }}>
-              ● Meta API
-            </span>
+            <span style={{ background: "#052E16", color: COLORS.success, border: `1px solid ${COLORS.success}44`, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20 }}>● Meta API</span>
           </div>
         </div>
 
         {/* Content */}
         <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
-
-          {/* Erro banner */}
           {erro && (
             <div style={{ background: "#1A0808", border: `1px solid ${COLORS.danger}44`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: COLORS.danger }}>
-              ⚠️ Erro ao buscar dados da Meta: {erro}. Verifique se o token ainda é válido.
+              ⚠️ Erro ao buscar dados da Meta: {erro}
             </div>
           )}
 
-          {/* DASHBOARD TAB */}
+          {/* DASHBOARD */}
           {activeTab === "dashboard" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
-                <MetricCard loading={loading} label="Investimento (7d)" value={`R$${totalInvestimento.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} sub="Meta Ads — dados reais" subType="up" icon="💰" />
+                <MetricCard loading={loading} label="Investimento (7d)" value={`R$${totalInvestimento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`} sub="Meta Ads — dados reais" subType="up" icon="💰" />
                 <MetricCard loading={loading} label="Conversões (7d)" value={totalConversoes} sub={`${campanhasAtivas.length} campanhas ativas`} subType="up" icon="🎯" />
                 <MetricCard loading={loading} label="CPA médio" value={cpaMedio > 0 ? `R$${cpaMedio.toFixed(2)}` : "—"} sub="Custo por conversão" subType={cpaMedio > 150 ? "down" : "up"} icon="📉" />
                 <MetricCard loading={loading} label="Impressões (7d)" value={totalImpressions > 0 ? totalImpressions.toLocaleString("pt-BR") : "—"} sub="Alcance total" subType="up" icon="👁️" />
@@ -396,7 +408,6 @@ Responda de forma direta e prática, com recomendações específicas para essas
                 </div>
               </div>
 
-              {/* Status geral */}
               <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" }}>Resumo da conta</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
@@ -407,9 +418,7 @@ Responda de forma direta e prática, com recomendações específicas para essas
                   ].map((item, i) => (
                     <div key={i} style={{ background: "#0A0B0F", borderRadius: 10, padding: "16px 20px" }}>
                       <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 8 }}>{item.label}</div>
-                      <div style={{ fontSize: 32, fontWeight: 700, color: item.color, fontFamily: "'Space Grotesk', sans-serif" }}>
-                        {loading ? "—" : item.value}
-                      </div>
+                      <div style={{ fontSize: 32, fontWeight: 700, color: item.color, fontFamily: "'Space Grotesk', sans-serif" }}>{loading ? "—" : item.value}</div>
                     </div>
                   ))}
                 </div>
@@ -417,14 +426,15 @@ Responda de forma direta e prática, com recomendações específicas para essas
             </div>
           )}
 
-          {/* CAMPANHAS TAB */}
+          {/* CAMPANHAS */}
           {activeTab === "campanhas" && (
             <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              {/* Header com filtros e seletor de colunas */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif" }}>
                   Campanhas — Meta Ads (últimos 7 dias)
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {["Todas", "Ativas", "Pausadas"].map(f => (
                     <button key={f} onClick={() => setFiltro(f)} style={{
                       background: filtro === f ? COLORS.accent : "#1E2028",
@@ -433,51 +443,85 @@ Responda de forma direta e prática, com recomendações específicas para essas
                       fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
                     }}>{f}</button>
                   ))}
-                  <span style={{ fontSize: 11, color: COLORS.muted, alignSelf: "center", marginLeft: 4 }}>
-                    {campanhasFiltradas.length} campanhas
-                  </span>
+                  <span style={{ fontSize: 11, color: COLORS.muted, marginLeft: 4 }}>{campanhasFiltradas.length} campanhas</span>
+                  <div style={{ position: "relative" }}>
+                    <button onClick={() => setShowSeletorColunas(!showSeletorColunas)} style={{
+                      background: showSeletorColunas ? COLORS.accent : "#1E2028",
+                      border: `1px solid ${showSeletorColunas ? COLORS.accent : COLORS.border}`,
+                      borderRadius: 8, padding: "5px 14px",
+                      color: showSeletorColunas ? "#000" : COLORS.muted,
+                      fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                    }}>⊞ Colunas</button>
+
+                    {/* Dropdown seletor de colunas */}
+                    {showSeletorColunas && (
+                      <div style={{
+                        position: "absolute", right: 0, top: 36, zIndex: 100,
+                        background: "#1E2028", border: `1px solid ${COLORS.border}`,
+                        borderRadius: 10, padding: 16, width: 260,
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                      }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.muted, marginBottom: 12 }}>MÉTRICAS VISÍVEIS</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {COLUNAS_DISPONIVEIS.map(col => (
+                            <label key={col.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: colunasAtivas.includes(col.id) ? COLORS.text : COLORS.muted }}>
+                              <input
+                                type="checkbox"
+                                checked={colunasAtivas.includes(col.id)}
+                                onChange={() => toggleColuna(col.id)}
+                                style={{ accentColor: COLORS.accent, cursor: "pointer" }}
+                              />
+                              {col.label}
+                            </label>
+                          ))}
+                        </div>
+                        <button onClick={() => setShowSeletorColunas(false)} style={{
+                          marginTop: 14, width: "100%", background: COLORS.accent, border: "none",
+                          borderRadius: 8, padding: "8px", color: "#000", fontSize: 12,
+                          fontWeight: 700, cursor: "pointer",
+                        }}>Aplicar</button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
+
               {loading ? (
                 <div style={{ textAlign: "center", padding: 40, color: COLORS.muted }}>Carregando dados reais...</div>
               ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
-                      {["Campanha", "Status", "Gasto (7d)", "Conversões", "CPA", "CTR", "Impressões"].map(h => (
-                        <th key={h} style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, color: COLORS.muted, fontWeight: 600, paddingBottom: 12 }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {campanhasFiltradas.map((c, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
-                        <td style={{ padding: "14px 12px", color: COLORS.text, fontWeight: 500, maxWidth: 220 }}>
-                          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</div>
-                        </td>
-                        <td style={{ padding: "14px 12px" }}><StatusBadge status={c.status} /></td>
-                        <td style={{ padding: "14px 12px", color: COLORS.text }}>
-                          {c.investimento > 0 ? `R$${c.investimento.toFixed(2)}` : "—"}
-                        </td>
-                        <td style={{ padding: "14px 12px", color: COLORS.text }}>{c.conversoes || "—"}</td>
-                        <td style={{ padding: "14px 12px", color: c.cpa > 150 ? COLORS.danger : c.cpa > 0 ? COLORS.text : COLORS.muted }}>
-                          {c.cpa > 0 ? `R$${c.cpa.toFixed(2)}` : "—"}
-                        </td>
-                        <td style={{ padding: "14px 12px", color: COLORS.text }}>
-                          {c.ctr > 0 ? `${c.ctr.toFixed(2)}%` : "—"}
-                        </td>
-                        <td style={{ padding: "14px 12px", color: COLORS.muted }}>
-                          {c.impressions > 0 ? c.impressions.toLocaleString("pt-BR") : "—"}
-                        </td>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, color: COLORS.muted, fontWeight: 600, paddingBottom: 12, whiteSpace: "nowrap" }}>Campanha</th>
+                        <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, color: COLORS.muted, fontWeight: 600, paddingBottom: 12 }}>Status</th>
+                        {colunasVisiveis.map(col => (
+                          <th key={col.id} style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, color: COLORS.muted, fontWeight: 600, paddingBottom: 12, whiteSpace: "nowrap" }}>{col.label}</th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {campanhasFiltradas.map((c, i) => (
+                        <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+                          <td style={{ padding: "14px 12px", color: COLORS.text, fontWeight: 500, maxWidth: 200 }}>
+                            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</div>
+                          </td>
+                          <td style={{ padding: "14px 12px" }}><StatusBadge status={c.status} /></td>
+                          {colunasVisiveis.map(col => (
+                            <td key={col.id} style={{ padding: "14px 12px", color: getColunaColor(c, col.id), whiteSpace: "nowrap" }}>
+                              {getColunaValor(c, col.id)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
 
-          {/* AGENTES TAB */}
+          {/* AGENTES */}
           {activeTab === "agentes" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ background: "#061A0A", border: `1px solid ${COLORS.success}33`, borderRadius: 12, padding: "16px 20px", fontSize: 13, color: COLORS.success }}>
@@ -489,70 +533,36 @@ Responda de forma direta e prática, com recomendações específicas para essas
             </div>
           )}
 
-          {/* CHAT TAB */}
+          {/* CHAT */}
           {activeTab === "chat" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16, height: "100%" }}>
-              <div style={{
-                background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12,
-                padding: "20px 24px", flex: 1, display: "flex", flexDirection: "column",
-                gap: 12, minHeight: 300, maxHeight: 420, overflowY: "auto",
-              }}>
+              <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px", flex: 1, display: "flex", flexDirection: "column", gap: 12, minHeight: 300, maxHeight: 420, overflowY: "auto" }}>
                 {chatHistory.length === 0 && (
                   <div style={{ color: COLORS.muted, fontSize: 13, textAlign: "center", marginTop: 40 }}>
                     <div style={{ fontSize: 32, marginBottom: 12 }}>🤖</div>
                     <div>Agente com acesso aos seus dados reais do Meta Ads</div>
                     <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-                      {[
-                        "Quais campanhas estão gastando mais?",
-                        "Qual campanha tem melhor CPA?",
-                        "O que devo pausar agora?",
-                      ].map((s, i) => (
-                        <button key={i} onClick={() => askAI(s)} style={{
-                          background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8,
-                          padding: "8px 16px", color: COLORS.muted, fontSize: 12, cursor: "pointer",
-                          fontFamily: "'DM Sans', sans-serif",
-                        }}>{s}</button>
+                      {["Quais campanhas estão gastando mais?", "Qual campanha tem melhor CPA?", "O que devo pausar agora?"].map((s, i) => (
+                        <button key={i} onClick={() => askAI(s)} style={{ background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 16px", color: COLORS.muted, fontSize: 12, cursor: "pointer" }}>{s}</button>
                       ))}
                     </div>
                   </div>
                 )}
                 {chatHistory.map((msg, i) => (
                   <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-                    <div style={{
-                      maxWidth: "80%", background: msg.role === "user" ? "#1E2028" : "#061A0A",
-                      border: `1px solid ${msg.role === "user" ? COLORS.border : COLORS.success + "33"}`,
-                      borderRadius: 10, padding: "10px 14px", fontSize: 13, color: COLORS.text,
-                      lineHeight: 1.6, whiteSpace: "pre-wrap",
-                    }}>
+                    <div style={{ maxWidth: "80%", background: msg.role === "user" ? "#1E2028" : "#061A0A", border: `1px solid ${msg.role === "user" ? COLORS.border : COLORS.success + "33"}`, borderRadius: 10, padding: "10px 14px", fontSize: 13, color: COLORS.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
                       {msg.role === "assistant" && <div style={{ fontSize: 11, color: COLORS.success, marginBottom: 6, fontWeight: 600 }}>🤖 Agente — dados reais</div>}
                       {msg.content}
                     </div>
                   </div>
                 ))}
-                {aiLoading && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: COLORS.muted, fontSize: 13 }}>
-                    <span>🤖</span> Analisando suas campanhas reais...
-                  </div>
-                )}
+                {aiLoading && <div style={{ display: "flex", alignItems: "center", gap: 8, color: COLORS.muted, fontSize: 13 }}><span>🤖</span> Analisando suas campanhas reais...</div>}
                 <div ref={chatEndRef} />
               </div>
               <div style={{ display: "flex", gap: 10 }}>
-                <input
-                  value={aiInput}
-                  onChange={e => setAiInput(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && askAI(aiInput)}
-                  placeholder="Pergunte sobre suas campanhas reais..."
-                  style={{
-                    flex: 1, background: COLORS.card, border: `1px solid ${COLORS.border}`,
-                    borderRadius: 10, padding: "12px 16px", color: COLORS.text, fontSize: 13,
-                    fontFamily: "'DM Sans', sans-serif", outline: "none",
-                  }}
-                />
-                <button onClick={() => askAI(aiInput)} disabled={aiLoading || !aiInput.trim()} style={{
-                  background: COLORS.accent, border: "none", borderRadius: 10, padding: "12px 20px",
-                  color: "#000", fontSize: 13, fontWeight: 700, cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif", opacity: aiLoading || !aiInput.trim() ? 0.5 : 1,
-                }}>Enviar</button>
+                <input value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => e.key === "Enter" && askAI(aiInput)} placeholder="Pergunte sobre suas campanhas reais..."
+                  style={{ flex: 1, background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: "12px 16px", color: COLORS.text, fontSize: 13, outline: "none" }} />
+                <button onClick={() => askAI(aiInput)} disabled={aiLoading || !aiInput.trim()} style={{ background: COLORS.accent, border: "none", borderRadius: 10, padding: "12px 20px", color: "#000", fontSize: 13, fontWeight: 700, cursor: "pointer", opacity: aiLoading || !aiInput.trim() ? 0.5 : 1 }}>Enviar</button>
               </div>
             </div>
           )}
