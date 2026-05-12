@@ -14,15 +14,15 @@ export default async function handler(req, res) {
 
   const { periodo = "last_7d", inicio, fim } = req.query;
 
-  let dateParam = "";
+  let insightsParams = `date_preset:${periodo}`;
   if (periodo === "custom" && inicio && fim) {
-    dateParam = `&time_range={"since":"${inicio}","until":"${fim}"}`;
-  } else {
-    dateParam = `&date_preset=${periodo}`;
+    insightsParams = `time_range:{'since':'${inicio}','until':'${fim}'}`;
   }
 
   try {
-    const url = `https://graph.facebook.com/v19.0/${ACCOUNT_ID}/campaigns?fields=name,status,daily_budget,lifetime_budget,insights{spend,impressions,reach,clicks,actions}${dateParam}&access_token=${TOKEN}&limit=50`;
+    const fields = `name,status,daily_budget,lifetime_budget,insights.${insightsParams}{spend,impressions,reach,clicks,actions}`;
+    const url = `https://graph.facebook.com/v19.0/${ACCOUNT_ID}/campaigns?fields=${encodeURIComponent(fields)}&access_token=${TOKEN}&limit=50`;
+
     const response = await fetch(url);
     const data = await response.json();
 
