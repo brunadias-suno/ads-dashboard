@@ -155,10 +155,11 @@ export default function AdsDashboard() {
   const [ultimaAtualizacao, setUltimaAtualizacao] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInput, setAiInput] = useState("");
-  const [chatHistory, setChatHistory] = useState([]);const [filtro, setFiltro] = useState("Todas");
-const campanhasFiltradas = campanhas.filter(c =>
-  filtro === "Todas" ? true : filtro === "Ativas" ? c.status === "ACTIVE" : c.status === "PAUSED"
-);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [filtro, setFiltro] = useState("Todas");
+  const campanhasFiltradas = campanhas.filter(c =>
+    filtro === "Todas" ? true : filtro === "Ativas" ? c.status === "ACTIVE" : c.status === "PAUSED"
+  );
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -175,7 +176,7 @@ const campanhasFiltradas = campanhas.filter(c =>
     setErro(null);
     try {
       // Buscar campanhas com insights (spend, impressions, clicks, conversions)
-      const url = `/api/meta`;
+      const url = `https://graph.facebook.com/v19.0/${META_ACCOUNT_ID}/campaigns?fields=name,status,daily_budget,lifetime_budget,insights{spend,impressions,clicks,actions}&date_preset=last_7d&access_token=${META_TOKEN}&limit=50`;
       const res = await fetch(url);
       const data = await res.json();
 
@@ -448,8 +449,8 @@ Responda de forma direta e prática, com recomendações específicas para essas
                       ))}
                     </tr>
                   </thead>
-                  <tbody
-                    {campanhasFiltradas.map((c, i) =>
+                  <tbody>
+                    {campanhasFiltradas.map((c, i) => (
                       <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
                         <td style={{ padding: "14px 12px", color: COLORS.text, fontWeight: 500, maxWidth: 220 }}>
                           <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</div>
@@ -560,4 +561,3 @@ Responda de forma direta e prática, com recomendações específicas para essas
     </div>
   );
 }
- 
