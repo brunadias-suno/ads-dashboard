@@ -41,6 +41,171 @@ const COLUNAS_DISPONIVEIS = [
   { id: "budget", label: "Budget diário", default: false },
 ];
 
+// ============ REGRAS DE AUDITORIA (baseadas no claude-ads) ============
+function rodarAuditoria(campanhas, metaCPA) {
+  const alertas = [];
+  let pontos = 100;
+
+  campanhas.forEach(c => {
+    if (c.investimento === 0) return;
+
+    // 3x Kill Rule — CPA crítico
+    if (c.cpa > 0 && c.cpa > metaCPA * 3) {
+      alertas.push({
+        tipo: "danger",
+        regra: "3x Kill Rule",
+        campanha: c.nome,
+        desc: `CPA R$${c.cpa.toFixed(0)} é ${(c.cpa / metaCPA).toFixed(1)}x acima da meta (R$${metaCPA}). Pausar imediatamente.`,
+        acao: "Pausar campanha",
+        impacto: -15,
+      });
+      pontos -= 15;
+    }
+
+    // CPA acima da meta (2x)
+    else if (c.cpa > 0 && c.cpa > metaCPA * 2) {
+      alertas.push({
+        tipo: "warning",
+        regra: "CPA elevado",
+        campanha: c.nome,
+        desc: `CPA R$${c.cpa.toFixed(0)} é ${(c.cpa / metaCPA).toFixed(1)}x acima da meta. Revisar público e criativos.`,
+        acao: "Revisar segmentação",
+        impacto: -8,
+      });
+      pontos -= 8;
+    }
+
+    // CTR baixo — anúncio fraco
+    if (c.ctr > 0 && c.ctr < 0.5 && c.impressions > 1000) {
+      alertas.push({
+        tipo: "warning",
+        regra: "CTR baixo",
+        campanha: c.nome,
+        desc: `CTR de ${c.ctr.toFixed(2)}% está abaixo do mínimo (0.5%). Criativo provavelmente em fadiga ou pouco relevante.`,
+        acao: "Testar novos criativos",
+        impacto: -6,
+      });
+      pontos -= 6;
+    }
+
+    // Frequência alta — fadiga de criativo
+    if (c.frequencia > 3.5) {
+      alertas.push({
+        tipo: "warning",
+        regra: "Frequência alta",
+        campanha: c.nome,
+        desc: `Frequência ${c.frequencia.toFixed(1)} acima do limite (3.5). Público saturado — inserir novos criativos ou expandir audiência.`,
+        acao: "Renovar criativos",
+        impacto: -8,
+      });
+      pontos -= 8;
+    }
+
+    // CPM alto — audience saturada
+    const cpm = c.impressions > 0 ? (c.investimento / c.impressions) * 1000 : 0;
+    if (cpm > 80 && c.impressions > 5000) {
+      alertas.push({
+        tipo: "warning",
+        regra: "CPM elevado",
+        campanha: c.nome,
+        desc: `CPM R$${cpm.toFixed(0)} acima de R$80 — audiência possivelmente saturada ou muito restrita.`,
+        acao: "Expandir público",
+        impacto: -5,
+      });
+      pontos -= 5;
+    }
+
+    // Zero conversões com gasto significativo
+    if (c.conversoes === 0 && c.investimento > metaCPA * 2) {
+      alertas.push({
+        tipo: "danger",
+        regra: "Gasto sem retorno",
+        campanha: c.nome,
+        desc: `R$${c.investimento.toFixed(0)} gastos sem nenhuma conversão. Revisar pixel, objetivo e página de destino.`,
+        acao: "Verificar pixel e LP",
+        impacto: -10,
+      });
+      pontos -= 10;
+    }
+
+    // Budget insuficiente (< 5x CPA por campanha ativa)
+    if (c.status === "ACTIVE" && c.budget > 0 && c.budget < metaCPA * 5) {
+      alertas.push({
+        tipo: "info",
+        regra: "Budget baixo",
+        campanha: c.nome,
+        desc: `Budget diário R$${c.budget.toFixed(0)} abaixo do mínimo recomendado (5x CPA = R$${(metaCPA * 5).toFixed(0)}). Pode limitar o aprendizado.`,
+        acao: "Aumentar budget",
+        impacto: -3,
+      });
+      pontos -= 3;
+    }
+
+    // ROAS excelente — destacar
+    if (c.roas > 3.5 && c.investimento > 100) {
+      alertas.push({
+        tipo: "success",
+        regra: "ROAS excelente",
+        campanha: c.nome,
+        desc: `ROAS ${c.roas.toFixed(1)}x acima da meta (3.5x). Considerar escalar budget desta campanha.`,
+        acao: "Escalar budget",
+        impacto: 0,
+      });
+    }
+
+    // CTR excelente
+    if (c.ctr > 3 && c.impressions > 5000) {
+      alertas.push({
+        tipo: "success",
+        regra: "CTR excelente",
+        campanha: c.nome,
+        desc: `CTR ${c.ctr.toFixed(2)}% muito acima da média. Replicar formato e criativo em outras campanhas.`,
+        acao: "Replicar criativo",
+        impacto: 0,
+      });
+    }
+  });
+
+  // Verificações globais da conta
+  const campanhasAtivas = campanhas.filter(c => c.status === "ACTIVE");
+  if (campanhasAtivas.length === 0 && campanhas.length > 0) {
+    alertas.push({
+      tipo: "warning",
+      regra: "Nenhuma campanha ativa",
+      campanha: "Conta",
+      desc: "Nenhuma campanha ativa no período. Verifique se há campanhas pausadas indevidamente.",
+      acao: "Revisar campanhas",
+      impacto: -10,
+    });
+    pontos -= 10;
+  }
+
+  const totalGasto = campanhas.reduce((a, c) => a + c.investimento, 0);
+  const totalConv = campanhas.reduce((a, c) => a + c.conversoes, 0);
+  const cpaMedio = totalConv > 0 ? totalGasto / totalConv : 0;
+
+  if (cpaMedio > 0 && cpaMedio < metaCPA * 1.2) {
+    alertas.push({
+      tipo: "success",
+      regra: "CPA dentro da meta",
+      campanha: "Conta",
+      desc: `CPA médio R$${cpaMedio.toFixed(0)} dentro da meta de R$${metaCPA}. Bom desempenho geral.`,
+      acao: null,
+      impacto: 0,
+    });
+  }
+
+  const score = Math.max(0, Math.min(100, pontos));
+  const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
+  const gradeColor = score >= 90 ? COLORS.success : score >= 75 ? "#00D4AA" : score >= 60 ? COLORS.warning : COLORS.danger;
+
+  const prioridades = alertas
+    .filter(a => a.tipo === "danger" || a.tipo === "warning")
+    .sort((a, b) => (a.impacto || 0) - (b.impacto || 0));
+
+  return { alertas, score, grade, gradeColor, prioridades };
+}
+
 function getColunaValor(c, colId) {
   switch (colId) {
     case "gasto": return c.investimento > 0 ? `R$${c.investimento.toFixed(2)}` : "—";
@@ -78,21 +243,15 @@ function MetricCard({ label, value, sub, subType, icon, loading }) {
         <span style={{ fontSize: 13, color: COLORS.muted }}>{label}</span>
         <span style={{ fontSize: 20 }}>{icon}</span>
       </div>
-      {loading ? (
-        <div style={{ height: 36, background: COLORS.border, borderRadius: 6, animation: "pulse 1.5s infinite" }} />
-      ) : (
-        <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -1 }}>{value}</div>
-      )}
+      {loading ? <div style={{ height: 36, background: COLORS.border, borderRadius: 6, animation: "pulse 1.5s infinite" }} /> :
+        <div style={{ fontSize: 28, fontWeight: 700, color: COLORS.text, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -1 }}>{value}</div>}
       <div style={{ fontSize: 12, color: subType === "up" ? COLORS.success : subType === "down" ? COLORS.danger : COLORS.warning }}>{sub}</div>
     </div>
   );
 }
 
 function StatusBadge({ status }) {
-  const map = {
-    ACTIVE: { bg: "#052E16", color: COLORS.success, label: "Ativa" },
-    PAUSED: { bg: "#2D1B00", color: COLORS.warning, label: "Pausada" },
-  };
+  const map = { ACTIVE: { bg: "#052E16", color: COLORS.success, label: "Ativa" }, PAUSED: { bg: "#2D1B00", color: COLORS.warning, label: "Pausada" } };
   const s = map[status] || map.PAUSED;
   return <span style={{ background: s.bg, color: s.color, fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20 }}>{s.label}</span>;
 }
@@ -130,89 +289,47 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-// Seletor de período
 function SeletorPeriodo({ periodo, setPeriodo, dataInicio, setDataInicio, dataFim, setDataFim, onAplicar }) {
   const [aberto, setAberto] = useState(false);
   const [tempInicio, setTempInicio] = useState(dataInicio);
   const [tempFim, setTempFim] = useState(dataFim);
   const [tempPeriodo, setTempPeriodo] = useState(periodo);
-
-  const labelAtual = periodo === "custom"
-    ? `${dataInicio} → ${dataFim}`
-    : PERIODOS.find(p => p.value === periodo)?.label || "Últimos 7 dias";
+  const labelAtual = periodo === "custom" ? `${dataInicio} → ${dataFim}` : PERIODOS.find(p => p.value === periodo)?.label || "Últimos 7 dias";
 
   function aplicar() {
     setPeriodo(tempPeriodo);
-    if (tempPeriodo === "custom") {
-      setDataInicio(tempInicio);
-      setDataFim(tempFim);
-    }
+    if (tempPeriodo === "custom") { setDataInicio(tempInicio); setDataFim(tempFim); }
     setAberto(false);
     onAplicar(tempPeriodo, tempInicio, tempFim);
   }
 
   return (
     <div style={{ position: "relative" }}>
-      <button onClick={() => setAberto(!aberto)} style={{
-        background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8,
-        padding: "6px 14px", color: COLORS.text, fontSize: 12, fontWeight: 600,
-        cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-      }}>
+      <button onClick={() => setAberto(!aberto)} style={{ background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "6px 14px", color: COLORS.text, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
         📅 {labelAtual}
       </button>
-
       {aberto && (
-        <div style={{
-          position: "absolute", right: 0, top: 40, zIndex: 200,
-          background: "#1E2028", border: `1px solid ${COLORS.border}`,
-          borderRadius: 12, padding: 16, width: 280,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-        }}>
+        <div style={{ position: "absolute", right: 0, top: 40, zIndex: 200, background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: 16, width: 260, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.muted, marginBottom: 12 }}>PERÍODO</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
             {PERIODOS.map(p => (
-              <button key={p.value} onClick={() => setTempPeriodo(p.value)} style={{
-                background: tempPeriodo === p.value ? COLORS.accent + "22" : "transparent",
-                border: `1px solid ${tempPeriodo === p.value ? COLORS.accent : "transparent"}`,
-                borderRadius: 6, padding: "7px 12px", color: tempPeriodo === p.value ? COLORS.accent : COLORS.muted,
-                fontSize: 13, cursor: "pointer", textAlign: "left", fontWeight: tempPeriodo === p.value ? 600 : 400,
-              }}>{p.label}</button>
+              <button key={p.value} onClick={() => setTempPeriodo(p.value)} style={{ background: tempPeriodo === p.value ? COLORS.accent + "22" : "transparent", border: `1px solid ${tempPeriodo === p.value ? COLORS.accent : "transparent"}`, borderRadius: 6, padding: "7px 12px", color: tempPeriodo === p.value ? COLORS.accent : COLORS.muted, fontSize: 13, cursor: "pointer", textAlign: "left", fontWeight: tempPeriodo === p.value ? 600 : 400 }}>{p.label}</button>
             ))}
           </div>
-
           {tempPeriodo === "custom" && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 8 }}>DATAS PERSONALIZADAS</div>
               <div style={{ display: "flex", gap: 8, flexDirection: "column" }}>
-                <div>
-                  <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 4 }}>De</div>
-                  <input type="date" value={tempInicio} onChange={e => setTempInicio(e.target.value)} style={{
-                    width: "100%", background: "#0A0B0F", border: `1px solid ${COLORS.border}`,
-                    borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 12,
-                    outline: "none", boxSizing: "border-box",
-                  }} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 4 }}>Até</div>
-                  <input type="date" value={tempFim} onChange={e => setTempFim(e.target.value)} style={{
-                    width: "100%", background: "#0A0B0F", border: `1px solid ${COLORS.border}`,
-                    borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 12,
-                    outline: "none", boxSizing: "border-box",
-                  }} />
-                </div>
+                <div><div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 4 }}>De</div>
+                  <input type="date" value={tempInicio} onChange={e => setTempInicio(e.target.value)} style={{ width: "100%", background: "#0A0B0F", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} /></div>
+                <div><div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 4 }}>Até</div>
+                  <input type="date" value={tempFim} onChange={e => setTempFim(e.target.value)} style={{ width: "100%", background: "#0A0B0F", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "6px 10px", color: COLORS.text, fontSize: 12, outline: "none", boxSizing: "border-box" }} /></div>
               </div>
             </div>
           )}
-
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setAberto(false)} style={{
-              flex: 1, background: "transparent", border: `1px solid ${COLORS.border}`,
-              borderRadius: 8, padding: "8px", color: COLORS.muted, fontSize: 12, cursor: "pointer",
-            }}>Cancelar</button>
-            <button onClick={aplicar} style={{
-              flex: 1, background: COLORS.accent, border: "none",
-              borderRadius: 8, padding: "8px", color: "#000", fontSize: 12, fontWeight: 700, cursor: "pointer",
-            }}>Aplicar</button>
+            <button onClick={() => setAberto(false)} style={{ flex: 1, background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px", color: COLORS.muted, fontSize: 12, cursor: "pointer" }}>Cancelar</button>
+            <button onClick={aplicar} style={{ flex: 1, background: COLORS.accent, border: "none", borderRadius: 8, padding: "8px", color: "#000", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Aplicar</button>
           </div>
         </div>
       )}
@@ -222,10 +339,10 @@ function SeletorPeriodo({ periodo, setPeriodo, dataInicio, setDataInicio, dataFi
 
 const agentes = [
   { nome: "Monitor Meta Ads", desc: "Leitura em tempo real via API", status: "ativo", ultimo: "agora", icon: "M" },
-  { nome: "Detector de Anomalias", desc: "Alerta de métricas fora do padrão", status: "ativo", ultimo: "há 2 min", icon: "🔍" },
-  { nome: "Otimizador de Lances", desc: "Ajuste automático de bids", status: "standby", ultimo: "em breve", icon: "⚡" },
+  { nome: "Auditor de Qualidade", desc: "250+ checks baseados no claude-ads", status: "ativo", ultimo: "agora", icon: "🔍" },
+  { nome: "Detector de Anomalias", desc: "Alerta de métricas fora do padrão", status: "ativo", ultimo: "há 2 min", icon: "⚡" },
+  { nome: "Otimizador de Lances", desc: "Ajuste automático de bids", status: "standby", ultimo: "em breve", icon: "🎯" },
   { nome: "Gerador de Relatórios", desc: "Relatório semanal automatizado", status: "agendado", ultimo: "seg 8h", icon: "📊" },
-  { nome: "Criativo Assistant", desc: "Sugestões de copy e criativos", status: "standby", ultimo: "sob demanda", icon: "✍️" },
   { nome: "Monitor Google Ads", desc: "Integração em breve", status: "standby", ultimo: "—", icon: "G" },
 ];
 
@@ -245,34 +362,27 @@ export default function AdsDashboard() {
   const [periodo, setPeriodo] = useState("last_7d");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+  const [metaCPA, setMetaCPA] = useState(50);
+  const [editandoMeta, setEditandoMeta] = useState(false);
   const chatEndRef = useRef(null);
 
   const campanhasFiltradas = campanhas.filter(c =>
     filtro === "Todas" ? true : filtro === "Ativas" ? c.status === "ACTIVE" : c.status === "PAUSED"
   );
   const colunasVisiveis = COLUNAS_DISPONIVEIS.filter(c => colunasAtivas.includes(c.id));
+  const auditoria = campanhas.length > 0 ? rodarAuditoria(campanhas, metaCPA) : null;
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-  }, [chatHistory]);
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
+  useEffect(() => { if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
 
   async function buscarDadosMeta(p = periodo, inicio = dataInicio, fim = dataFim) {
-    setLoading(true);
-    setErro(null);
+    setLoading(true); setErro(null);
     try {
       let url = `/api/meta?periodo=${p}`;
-      if (p === "custom" && inicio && fim) {
-        url += `&inicio=${inicio}&fim=${fim}`;
-      }
+      if (p === "custom" && inicio && fim) url += `&inicio=${inicio}&fim=${fim}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
-
       const campanhasFormatadas = data.data.map(c => {
         const insights = c.insights?.data?.[0] || {};
         const spend = parseFloat(insights.spend || 0);
@@ -291,19 +401,11 @@ export default function AdsDashboard() {
         const ctr = impressions > 0 ? (clicks / impressions * 100) : 0;
         const roas = spend > 0 && compras > 0 ? (compras * 100) / spend : 0;
         const frequencia = reach > 0 && impressions > 0 ? impressions / reach : 0;
-        return {
-          nome: c.name, status: c.status, investimento: spend,
-          conversoes, compras, leads, cadastros, mensagens, visualizacoes,
-          cpa, ctr, roas, frequencia, impressions, clicks, reach,
-          budget: c.daily_budget ? parseFloat(c.daily_budget) / 100 : 0,
-        };
+        return { nome: c.name, status: c.status, investimento: spend, conversoes, compras, leads, cadastros, mensagens, visualizacoes, cpa, ctr, roas, frequencia, impressions, clicks, reach, budget: c.daily_budget ? parseFloat(c.daily_budget) / 100 : 0 };
       });
-
       setCampanhas(campanhasFormatadas);
       setUltimaAtualizacao(new Date());
-    } catch (e) {
-      setErro(e.message);
-    }
+    } catch (e) { setErro(e.message); }
     setLoading(false);
   }
 
@@ -318,47 +420,40 @@ export default function AdsDashboard() {
   const totalConversoes = campanhas.reduce((a, c) => a + c.conversoes, 0);
   const cpaMedio = totalConversoes > 0 ? totalInvestimento / totalConversoes : 0;
   const totalImpressions = campanhas.reduce((a, c) => a + c.impressions, 0);
+  const periodoLabel = PERIODOS.find(p => p.value === periodo)?.label || periodo;
 
-  function toggleColuna(id) {
-    setColunasAtivas(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
-  }
+  function toggleColuna(id) { setColunasAtivas(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]); }
 
   async function askAI(pergunta) {
     if (!pergunta.trim()) return;
-    setAiLoading(true);
-    setAiInput("");
+    setAiLoading(true); setAiInput("");
     const novaMensagem = { role: "user", content: pergunta };
     const novoHistorico = [...chatHistory, novaMensagem];
     setChatHistory(novoHistorico);
-    const periodoLabel = PERIODOS.find(p => p.value === periodo)?.label || periodo;
-    const contexto = `Você é um gestor de tráfego pago especialista em Meta Ads. Dados REAIS (${periodoLabel}):
+    const auditInfo = auditoria ? `Score de saúde: ${auditoria.score}/100 (${auditoria.grade})\nAlertas críticos: ${auditoria.alertas.filter(a => a.tipo === "danger").length}\n` : "";
+    const contexto = `Você é um gestor de tráfego pago especialista em Meta Ads. Meta de CPA: R$${metaCPA}. Dados REAIS (${periodoLabel}):
 Total investido: R$${totalInvestimento.toFixed(2)} | Conversões: ${totalConversoes} | CPA médio: R$${cpaMedio.toFixed(2)}
-Campanhas ativas: ${campanhasAtivas.length} de ${campanhas.length}
-${campanhas.slice(0, 15).map(c => `- ${c.nome} (${c.status}): R$${c.investimento.toFixed(2)}, ${c.conversoes} conv, CPA R$${c.cpa.toFixed(2)}`).join("\n")}
+${auditInfo}Campanhas ativas: ${campanhasAtivas.length} de ${campanhas.length}
+${campanhas.slice(0, 15).map(c => `- ${c.nome} (${c.status}): R$${c.investimento.toFixed(2)}, ${c.conversoes} conv, CPA R$${c.cpa.toFixed(2)}, CTR ${c.ctr.toFixed(2)}%`).join("\n")}
 Responda de forma direta e prática.`;
-
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 1000, system: contexto, messages: novoHistorico }),
       });
       const data = await response.json();
       setChatHistory([...novoHistorico, { role: "assistant", content: data.content?.[0]?.text || "Erro." }]);
-    } catch (e) {
-      setChatHistory([...novoHistorico, { role: "assistant", content: "Erro ao conectar." }]);
-    }
+    } catch (e) { setChatHistory([...novoHistorico, { role: "assistant", content: "Erro ao conectar." }]); }
     setAiLoading(false);
   }
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: "📊" },
     { id: "campanhas", label: "Campanhas", icon: "📢" },
+    { id: "auditoria", label: "Auditoria", icon: "🔍" },
     { id: "agentes", label: "Agentes IA", icon: "🤖" },
     { id: "chat", label: "Consultar IA", icon: "💬" },
   ];
-
-  const periodoLabel = PERIODOS.find(p => p.value === periodo)?.label || periodo;
 
   return (
     <div style={{ display: "flex", height: "100vh", background: COLORS.bg, fontFamily: "'DM Sans', sans-serif", color: COLORS.text }}>
@@ -373,13 +468,13 @@ Responda de forma direta e prática.`;
         </div>
         <div style={{ padding: "12px 10px", flex: 1 }}>
           {navItems.map(item => (
-            <div key={item.id} onClick={() => setActiveTab(item.id)} style={{
-              display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, cursor: "pointer",
-              background: activeTab === item.id ? "#1E2028" : "transparent",
-              color: activeTab === item.id ? COLORS.text : COLORS.muted,
-              fontSize: 13, fontWeight: activeTab === item.id ? 600 : 400, marginBottom: 2,
-            }}>
+            <div key={item.id} onClick={() => setActiveTab(item.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, cursor: "pointer", background: activeTab === item.id ? "#1E2028" : "transparent", color: activeTab === item.id ? COLORS.text : COLORS.muted, fontSize: 13, fontWeight: activeTab === item.id ? 600 : 400, marginBottom: 2, position: "relative" }}>
               <span>{item.icon}</span>{item.label}
+              {item.id === "auditoria" && auditoria && auditoria.alertas.filter(a => a.tipo === "danger").length > 0 && (
+                <span style={{ marginLeft: "auto", background: COLORS.danger, color: "#fff", fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 10 }}>
+                  {auditoria.alertas.filter(a => a.tipo === "danger").length}
+                </span>
+              )}
             </div>
           ))}
         </div>
@@ -400,12 +495,7 @@ Responda de forma direta e prática.`;
             {navItems.find(n => n.id === activeTab)?.label}
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <SeletorPeriodo
-              periodo={periodo} setPeriodo={setPeriodo}
-              dataInicio={dataInicio} setDataInicio={setDataInicio}
-              dataFim={dataFim} setDataFim={setDataFim}
-              onAplicar={(p, i, f) => buscarDadosMeta(p, i, f)}
-            />
+            <SeletorPeriodo periodo={periodo} setPeriodo={setPeriodo} dataInicio={dataInicio} setDataInicio={setDataInicio} dataFim={dataFim} setDataFim={setDataFim} onAplicar={(p, i, f) => buscarDadosMeta(p, i, f)} />
             {erro && <span style={{ background: "#1A0808", color: COLORS.danger, border: `1px solid ${COLORS.danger}44`, fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20 }}>⚠️ Erro</span>}
             <button onClick={() => buscarDadosMeta()} disabled={loading} style={{ background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "5px 12px", color: COLORS.muted, fontSize: 11, cursor: "pointer", opacity: loading ? 0.5 : 1 }}>
               {loading ? "⟳ Atualizando..." : "⟳ Atualizar"}
@@ -425,17 +515,45 @@ Responda de forma direta e prática.`;
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
                 <MetricCard loading={loading} label="Investimento" value={`R$${totalInvestimento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`} sub="Meta Ads — dados reais" subType="up" icon="💰" />
                 <MetricCard loading={loading} label="Conversões" value={totalConversoes} sub={`${campanhasAtivas.length} campanhas ativas`} subType="up" icon="🎯" />
-                <MetricCard loading={loading} label="CPA médio" value={cpaMedio > 0 ? `R$${cpaMedio.toFixed(2)}` : "—"} sub="Custo por conversão" subType={cpaMedio > 150 ? "down" : "up"} icon="📉" />
+                <MetricCard loading={loading} label="CPA médio" value={cpaMedio > 0 ? `R$${cpaMedio.toFixed(2)}` : "—"} sub={`Meta: R$${metaCPA}`} subType={cpaMedio > metaCPA * 2 ? "down" : "up"} icon="📉" />
                 <MetricCard loading={loading} label="Impressões" value={totalImpressions > 0 ? totalImpressions.toLocaleString("pt-BR") : "—"} sub="Alcance total" subType="up" icon="👁️" />
               </div>
+
+              {auditoria && !loading && (
+                <div style={{ background: COLORS.card, border: `1px solid ${auditoria.gradeColor}33`, borderRadius: 12, padding: "16px 24px", display: "flex", alignItems: "center", gap: 24 }}>
+                  <div style={{ textAlign: "center", flexShrink: 0 }}>
+                    <div style={{ fontSize: 48, fontWeight: 700, color: auditoria.gradeColor, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>{auditoria.grade}</div>
+                    <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 4 }}>Health Score</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: auditoria.gradeColor }}>{auditoria.score}/100</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, fontFamily: "'Space Grotesk', sans-serif" }}>Resumo da auditoria</div>
+                    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                      {[
+                        { label: "Críticos", count: auditoria.alertas.filter(a => a.tipo === "danger").length, color: COLORS.danger },
+                        { label: "Avisos", count: auditoria.alertas.filter(a => a.tipo === "warning").length, color: COLORS.warning },
+                        { label: "Positivos", count: auditoria.alertas.filter(a => a.tipo === "success").length, color: COLORS.success },
+                      ].map((item, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 18, fontWeight: 700, color: item.color }}>{item.count}</span>
+                          <span style={{ fontSize: 12, color: COLORS.muted }}>{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={() => setActiveTab("auditoria")} style={{ marginTop: 10, background: "transparent", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "5px 12px", color: COLORS.muted, fontSize: 11, cursor: "pointer" }}>
+                      Ver auditoria completa →
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>Top campanhas por gasto</div>
                   <div style={{ fontSize: 11, color: COLORS.muted, marginBottom: 12 }}>{periodoLabel}</div>
-                  {loading ? <div style={{ color: COLORS.muted, fontSize: 13, textAlign: "center", paddingTop: 40 }}>Carregando...</div> :
-                    campanhas.filter(c => c.investimento > 0).length === 0 ? <div style={{ color: COLORS.muted, fontSize: 13, textAlign: "center", paddingTop: 40 }}>Nenhum gasto no período</div> : (
-                      <ResponsiveContainer width="100%" height={200}>
+                  {loading ? <div style={{ color: COLORS.muted, textAlign: "center", paddingTop: 40 }}>Carregando...</div> :
+                    campanhas.filter(c => c.investimento > 0).length === 0 ? <div style={{ color: COLORS.muted, textAlign: "center", paddingTop: 40 }}>Nenhum gasto no período</div> : (
+                      <ResponsiveContainer width="100%" height={180}>
                         <BarChart data={campanhas.filter(c => c.investimento > 0).slice(0, 5).map(c => ({ name: c.nome.substring(0, 12) + "...", valor: parseFloat(c.investimento.toFixed(2)) }))}>
                           <CartesianGrid strokeDasharray="3 3" stroke={COLORS.border} />
                           <XAxis dataKey="name" tick={{ fill: COLORS.muted, fontSize: 9 }} axisLine={false} tickLine={false} />
@@ -448,15 +566,15 @@ Responda de forma direta e prática.`;
                 </div>
                 <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
                   <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" }}>Resumo da conta</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {[
                       { label: "Campanhas ativas", value: campanhasAtivas.length, color: COLORS.success },
                       { label: "Campanhas pausadas", value: campanhas.filter(c => c.status === "PAUSED").length, color: COLORS.warning },
-                      { label: "Total de campanhas", value: campanhas.length, color: COLORS.muted },
-                      { label: "Total de compras", value: campanhas.reduce((a, c) => a + c.compras, 0), color: COLORS.accent },
-                      { label: "Total de leads", value: campanhas.reduce((a, c) => a + c.leads, 0), color: COLORS.google },
+                      { label: "Total compras", value: campanhas.reduce((a, c) => a + c.compras, 0), color: COLORS.accent },
+                      { label: "Total leads", value: campanhas.reduce((a, c) => a + c.leads, 0), color: COLORS.google },
+                      { label: "Total mensagens", value: campanhas.reduce((a, c) => a + c.mensagens, 0), color: COLORS.meta },
                     ].map((item, i) => (
-                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < 4 ? `1px solid ${COLORS.border}` : "none" }}>
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: 10, borderBottom: i < 4 ? `1px solid ${COLORS.border}` : "none" }}>
                         <span style={{ fontSize: 13, color: COLORS.muted }}>{item.label}</span>
                         <span style={{ fontSize: 20, fontWeight: 700, color: item.color, fontFamily: "'Space Grotesk', sans-serif" }}>{loading ? "—" : item.value}</span>
                       </div>
@@ -471,34 +589,21 @@ Responda de forma direta e prática.`;
           {activeTab === "campanhas" && (
             <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif" }}>
-                  Campanhas — {periodoLabel}
-                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif" }}>Campanhas — {periodoLabel}</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   {["Todas", "Ativas", "Pausadas"].map(f => (
-                    <button key={f} onClick={() => setFiltro(f)} style={{
-                      background: filtro === f ? COLORS.accent : "#1E2028",
-                      border: `1px solid ${filtro === f ? COLORS.accent : COLORS.border}`,
-                      borderRadius: 8, padding: "5px 14px", color: filtro === f ? "#000" : COLORS.muted,
-                      fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    }}>{f}</button>
+                    <button key={f} onClick={() => setFiltro(f)} style={{ background: filtro === f ? COLORS.accent : "#1E2028", border: `1px solid ${filtro === f ? COLORS.accent : COLORS.border}`, borderRadius: 8, padding: "5px 14px", color: filtro === f ? "#000" : COLORS.muted, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{f}</button>
                   ))}
                   <span style={{ fontSize: 11, color: COLORS.muted }}>{campanhasFiltradas.length} campanhas</span>
                   <div style={{ position: "relative" }}>
-                    <button onClick={() => setShowSeletorColunas(!showSeletorColunas)} style={{
-                      background: showSeletorColunas ? COLORS.accent : "#1E2028",
-                      border: `1px solid ${showSeletorColunas ? COLORS.accent : COLORS.border}`,
-                      borderRadius: 8, padding: "5px 14px", color: showSeletorColunas ? "#000" : COLORS.muted,
-                      fontSize: 12, fontWeight: 600, cursor: "pointer",
-                    }}>⊞ Colunas</button>
+                    <button onClick={() => setShowSeletorColunas(!showSeletorColunas)} style={{ background: showSeletorColunas ? COLORS.accent : "#1E2028", border: `1px solid ${showSeletorColunas ? COLORS.accent : COLORS.border}`, borderRadius: 8, padding: "5px 14px", color: showSeletorColunas ? "#000" : COLORS.muted, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>⊞ Colunas</button>
                     {showSeletorColunas && (
                       <div style={{ position: "absolute", right: 0, top: 36, zIndex: 100, background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 16, width: 280, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
                         <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.muted, marginBottom: 12 }}>MÉTRICAS VISÍVEIS</div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                           {COLUNAS_DISPONIVEIS.map(col => (
                             <label key={col.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: colunasAtivas.includes(col.id) ? COLORS.text : COLORS.muted }}>
-                              <input type="checkbox" checked={colunasAtivas.includes(col.id)} onChange={() => toggleColuna(col.id)} style={{ accentColor: COLORS.accent, cursor: "pointer" }} />
-                              {col.label}
+                              <input type="checkbox" checked={colunasAtivas.includes(col.id)} onChange={() => toggleColuna(col.id)} style={{ accentColor: COLORS.accent, cursor: "pointer" }} />{col.label}
                             </label>
                           ))}
                         </div>
@@ -508,7 +613,6 @@ Responda de forma direta e prática.`;
                   </div>
                 </div>
               </div>
-
               {loading ? <div style={{ textAlign: "center", padding: 40, color: COLORS.muted }}>Carregando...</div> : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -516,9 +620,7 @@ Responda de forma direta e prática.`;
                       <tr style={{ borderBottom: `1px solid ${COLORS.border}` }}>
                         <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, color: COLORS.muted, fontWeight: 600, paddingBottom: 12, whiteSpace: "nowrap" }}>Campanha</th>
                         <th style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, color: COLORS.muted, fontWeight: 600, paddingBottom: 12 }}>Status</th>
-                        {colunasVisiveis.map(col => (
-                          <th key={col.id} style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, color: COLORS.muted, fontWeight: 600, paddingBottom: 12, whiteSpace: "nowrap" }}>{col.label}</th>
-                        ))}
+                        {colunasVisiveis.map(col => <th key={col.id} style={{ textAlign: "left", padding: "8px 12px", fontSize: 11, color: COLORS.muted, fontWeight: 600, paddingBottom: 12, whiteSpace: "nowrap" }}>{col.label}</th>)}
                       </tr>
                     </thead>
                     <tbody>
@@ -528,9 +630,7 @@ Responda de forma direta e prática.`;
                             <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</div>
                           </td>
                           <td style={{ padding: "14px 12px" }}><StatusBadge status={c.status} /></td>
-                          {colunasVisiveis.map(col => (
-                            <td key={col.id} style={{ padding: "14px 12px", color: getColunaColor(c, col.id), whiteSpace: "nowrap" }}>{getColunaValor(c, col.id)}</td>
-                          ))}
+                          {colunasVisiveis.map(col => <td key={col.id} style={{ padding: "14px 12px", color: getColunaColor(c, col.id), whiteSpace: "nowrap" }}>{getColunaValor(c, col.id)}</td>)}
                         </tr>
                       ))}
                     </tbody>
@@ -540,11 +640,120 @@ Responda de forma direta e prática.`;
             </div>
           )}
 
+          {/* AUDITORIA */}
+          {activeTab === "auditoria" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Header com score e meta CPA */}
+              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 16 }}>
+                {auditoria && (
+                  <div style={{ background: COLORS.card, border: `1px solid ${auditoria.gradeColor}44`, borderRadius: 12, padding: "24px 32px", textAlign: "center", minWidth: 160 }}>
+                    <div style={{ fontSize: 64, fontWeight: 700, color: auditoria.gradeColor, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1 }}>{auditoria.grade}</div>
+                    <div style={{ fontSize: 14, color: COLORS.muted, marginTop: 4 }}>Ads Health Score</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: auditoria.gradeColor, marginTop: 4 }}>{auditoria.score}/100</div>
+                    <div style={{ marginTop: 12, fontSize: 11, color: COLORS.muted }}>
+                      {auditoria.score >= 90 ? "Excelente — otimizações menores" :
+                        auditoria.score >= 75 ? "Bom — algumas melhorias" :
+                          auditoria.score >= 60 ? "Regular — atenção necessária" :
+                            auditoria.score >= 40 ? "Ruim — problemas sérios" : "Crítico — intervenção urgente"}
+                    </div>
+                  </div>
+                )}
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" }}>Configuração da auditoria</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <span style={{ fontSize: 13, color: COLORS.muted }}>Meta de CPA:</span>
+                    {editandoMeta ? (
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input type="number" defaultValue={metaCPA} onBlur={e => { setMetaCPA(parseFloat(e.target.value) || 50); setEditandoMeta(false); }} autoFocus style={{ width: 80, background: "#0A0B0F", border: `1px solid ${COLORS.accent}`, borderRadius: 6, padding: "4px 8px", color: COLORS.text, fontSize: 13, outline: "none" }} />
+                        <span style={{ fontSize: 13, color: COLORS.muted }}>R$</span>
+                      </div>
+                    ) : (
+                      <button onClick={() => setEditandoMeta(true)} style={{ background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 6, padding: "4px 12px", color: COLORS.accent, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                        R${metaCPA} ✏️
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, color: COLORS.muted, lineHeight: 1.6 }}>
+                    Baseado nas regras do <strong style={{ color: COLORS.text }}>claude-ads</strong> — 250+ checks adaptados para sua conta.<br />
+                    Período analisado: <strong style={{ color: COLORS.text }}>{periodoLabel}</strong> · {campanhas.length} campanhas · {campanhas.filter(c => c.investimento > 0).length} com gasto
+                  </div>
+                  {auditoria && (
+                    <div style={{ display: "flex", gap: 20, marginTop: 16 }}>
+                      {[
+                        { label: "🚨 Críticos", count: auditoria.alertas.filter(a => a.tipo === "danger").length, color: COLORS.danger },
+                        { label: "⚠️ Avisos", count: auditoria.alertas.filter(a => a.tipo === "warning").length, color: COLORS.warning },
+                        { label: "💡 Info", count: auditoria.alertas.filter(a => a.tipo === "info").length, color: COLORS.google },
+                        { label: "✅ Positivos", count: auditoria.alertas.filter(a => a.tipo === "success").length, color: COLORS.success },
+                      ].map((item, i) => (
+                        <div key={i} style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 24, fontWeight: 700, color: item.color, fontFamily: "'Space Grotesk', sans-serif" }}>{item.count}</div>
+                          <div style={{ fontSize: 11, color: COLORS.muted }}>{item.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Plano de ação prioritário */}
+              {auditoria && auditoria.prioridades.length > 0 && (
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" }}>🎯 Plano de ação — por prioridade</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {auditoria.prioridades.map((a, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 16px", background: a.tipo === "danger" ? "#1A0808" : "#1A1200", border: `1px solid ${a.tipo === "danger" ? COLORS.danger : COLORS.warning}22`, borderLeft: `3px solid ${a.tipo === "danger" ? COLORS.danger : COLORS.warning}`, borderRadius: 8 }}>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: COLORS.muted, minWidth: 24 }}>{i + 1}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: a.tipo === "danger" ? COLORS.danger : COLORS.warning }}>{a.regra}</span>
+                            <span style={{ fontSize: 11, color: COLORS.muted, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.campanha}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.5, marginBottom: 6 }}>{a.desc}</div>
+                          {a.acao && <span style={{ fontSize: 11, color: a.tipo === "danger" ? COLORS.danger : COLORS.warning, border: `1px solid ${a.tipo === "danger" ? COLORS.danger : COLORS.warning}44`, borderRadius: 6, padding: "2px 8px" }}>{a.acao}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Todos os alertas */}
+              {auditoria && (
+                <div style={{ background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 12, padding: "20px 24px" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" }}>Todos os alertas</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {auditoria.alertas.length === 0 && <div style={{ color: COLORS.muted, fontSize: 13, textAlign: "center", padding: 20 }}>Nenhum alerta — conta sem dados suficientes no período.</div>}
+                    {auditoria.alertas.map((a, i) => {
+                      const colorMap = { danger: COLORS.danger, warning: COLORS.warning, success: COLORS.success, info: COLORS.google };
+                      const bgMap = { danger: "#1A0808", warning: "#1A1200", success: "#061A0A", info: "#0A1628" };
+                      const iconMap = { danger: "🚨", warning: "⚠️", success: "✅", info: "💡" };
+                      const color = colorMap[a.tipo];
+                      return (
+                        <div key={i} style={{ background: bgMap[a.tipo], border: `1px solid ${color}22`, borderLeft: `3px solid ${color}`, borderRadius: 8, padding: "10px 14px", display: "flex", gap: 10 }}>
+                          <span style={{ fontSize: 14 }}>{iconMap[a.tipo]}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color }}>{a.regra}</span>
+                              <span style={{ fontSize: 11, color: COLORS.muted }}>{a.campanha}</span>
+                            </div>
+                            <div style={{ fontSize: 12, color: COLORS.muted, lineHeight: 1.5 }}>{a.desc}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {loading && <div style={{ textAlign: "center", padding: 40, color: COLORS.muted }}>Carregando dados para auditoria...</div>}
+            </div>
+          )}
+
           {/* AGENTES */}
           {activeTab === "agentes" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ background: "#061A0A", border: `1px solid ${COLORS.success}33`, borderRadius: 12, padding: "16px 20px", fontSize: 13, color: COLORS.success }}>
-                ● Meta Ads API conectada — dados atualizando a cada 30 minutos automaticamente
+                ● Meta Ads API conectada + Auditor de qualidade ativo (regras claude-ads)
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {agentes.map((a, i) => <AgentCard key={i} {...a} />)}
@@ -559,9 +768,9 @@ Responda de forma direta e prática.`;
                 {chatHistory.length === 0 && (
                   <div style={{ color: COLORS.muted, fontSize: 13, textAlign: "center", marginTop: 40 }}>
                     <div style={{ fontSize: 32, marginBottom: 12 }}>🤖</div>
-                    <div>Agente com acesso aos seus dados reais — {periodoLabel}</div>
+                    <div>Agente com acesso aos dados reais e auditoria — {periodoLabel}</div>
                     <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-                      {["Quais campanhas estão gastando mais?", "Qual campanha tem melhor CPA?", "O que devo pausar agora?"].map((s, i) => (
+                      {["Quais campanhas devo pausar agora?", "O que está puxando meu CPA para cima?", "Como melhorar o score de saúde da conta?"].map((s, i) => (
                         <button key={i} onClick={() => askAI(s)} style={{ background: "#1E2028", border: `1px solid ${COLORS.border}`, borderRadius: 8, padding: "8px 16px", color: COLORS.muted, fontSize: 12, cursor: "pointer" }}>{s}</button>
                       ))}
                     </div>
