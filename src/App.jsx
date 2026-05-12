@@ -449,7 +449,7 @@ Responda de forma direta e prática, com recomendações específicas para essas
                     </tr>
                   </thead>
                   <tbody
-                    {campanhasFiltradas.map((c, i) => (
+                    {campanhasFiltradas.map((c, i) =>
                       <tr key={i} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
                         <td style={{ padding: "14px 12px", color: COLORS.text, fontWeight: 500, maxWidth: 220 }}>
                           <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</div>
